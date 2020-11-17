@@ -1,0 +1,14 @@
+base
+zoo
+changepoint
+MASS
+EnvCpt
+ggplot2
+reshape
+gridExtra
+data.table
+changepoint.influence
+changepoint.np
+changepoint.geo
+Rcpp
+ecp

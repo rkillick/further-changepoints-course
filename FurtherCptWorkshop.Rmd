@@ -1,0 +1,396 @@
+---
+title: "Further Changepoint Analysis"
+author: "Rebecca Killick(r.killick@lancs.ac.uk)"
+date: "NHS Workshop 2020"
+output:
+  beamer_presentation:
+    includes:
+      in_header: header.tex
+    theme: lancaster
+---
+
+```{r,include=FALSE}
+if(!require(changepoint)){
+  install.packages('changepoint')
+}
+library(changepoint)
+if(!require(EnvCpt)){
+  install.packages('EnvCpt')
+}
+library(EnvCpt)
+if(!require(changepoint.influence)){
+  install.packages('changepoint.influence')
+}
+library(changepoint.influence)
+if(!require(changepoint.geo)){
+  install.packages('changepoint.geo')
+}
+library(changepoint.geo)
+if(!require(ecp)){
+  install.packages('ecp')
+}
+library(ecp)
+knitr::opts_chunk$set(fig.align='center',fig.show='hold',fig.width=4,fig.height=4,size='footnotesize', cache=TRUE)
+knitr::opts_knit$set(progress = FALSE,verbose = FALSE)
+```
+
+## Workshop Plan
+* Recap of changepoints
+* Checking assumptions
+* Autocorrelation
+* Influence
+* Multivariate changepoints
+
+There will be tasks throughout the sections.
+
+## Recall: changepoints
+For data $y_1, \ldots, y_n$, if a changepoint exists at $\tau$, then $y_1,\ldots,y_{\tau}$ differ from $y_{\tau+1},\ldots,y_n$ in some way.  
+
+There are many different types of change.
+  
+```{r, echo=F, out.width='.3\\textwidth'}
+par(mar=c(4,4,.3,.3)) 
+set.seed(1)
+# Change in mean example following EFK
+x=1:500
+y=c(rnorm(100,1,sd=0.5),rnorm(150,0,sd=0.5),rnorm(200,2,sd=0.5),rnorm(50,0.5,sd=0.5))
+plot(x,y,type='l',xlab='',ylab='')
+lines(x=1:100,y=rep(1,100),col='red',lwd=3)
+lines(x=101:250,y=rep(0,150),col='red',lwd=3)
+lines(x=251:450,y=rep(2,200),col='red',lwd=3)
+lines(x=451:500,y=rep(0.5,50),col='red',lwd=3)
+# Change in variance example following EFK
+x=1:500
+y=c(rnorm(100,0,sd=0.1),rnorm(150,0,sd=0.7),rnorm(200,0,sd=0.25),rnorm(50,0,sd=1))
+plot(x,y,type='l',xlab='',ylab='')
+# Change in regression
+x=1:500
+y=c(0.01*x[1:100],1.5-0.02*(x[101:250]-101),(10^-5)*(-150000+2.5*(x[251:450]^2-251^2)-(x[251:450]-250)),rep(1,50))
+ynoise=y+rnorm(500,0,0.2)
+plot(x,ynoise,type='l',xlab='',ylab='')
+lines(x=1:100,y=0.01*x[1:100],lwd=3,col='red')
+lines(x=101:250,y=1.5-0.02*(x[101:250]-101),lwd=3,col='red')
+lines(x=251:450,y=(10^-5)*(-150000+2.5*(x[251:450]^2-251^2)-(x[251:450]-250)),lwd=3,col='red')
+lines(x=451:500,y=rep(1,50),lwd=3,col='red')
+```
+
+## Packages
+Today we will use the following packages
+
+`library(changepoint)`
+
+`library(EnvCpt)`
+
+`library(changepoint.influence)`
+
+`library(changepoint.geo)`
+
+Other notable `R` packages are available for changepoint analysis including
+
+* `ecp` - for univariate and multivariate energy test statistics 
+* `InspectChangepoint` - for multivariate Inspect projection direction mean only change
+* `hdbinseg` - for multivariate double CUSUM test statistic
+* `BayesProject` - for multivariate changepoints
+
+## Checking Assumptions
+The main assumptions for a Normal likelihood ratio test for a change in mean are:
+
+* Independent data points;
+* Normal distributed points pre and post change;
+* Constant variance across the data.
+
+How can we check these?
+
+## How to check
+* Check the residuals
+```{r}
+set.seed(1)
+m1=c(rnorm(100,0,1),rnorm(100,5,1))
+m1.amoc=cpt.mean(m1)
+
+
+means=param.est(m1.amoc)$mean
+m1.resid=m1-rep(means,seg.len(m1.amoc))
+shapiro.test(m1.resid)
+```
+
+## Residual Check
+```{r}
+ks.test(m1.resid,pnorm,mean=mean(m1.resid),sd=sd(m1.resid))
+```
+
+## Residual Check
+```{r,out.height='0.6\\textheight'}
+qqnorm(m1.resid)
+qqline(m1.resid)
+```
+
+## Residual Check
+```{r,out.height='0.6\\textheight'}
+acf(m1.resid)
+```
+
+## Autocorrelation
+
+What effect does autocorrelation have on our analysis?
+
+```{r, out.height='0.6\\textheight'}
+set.seed(879123)
+x=c(rnorm(100),rnorm(100,3))
+plot(cpt.meanvar(x,method='PELT'))
+```
+
+## Autocorrelation +ve
+
+What effect does autocorrelation have on our analysis?
+
+```{r, out.height='0.5\\textheight'}
+source('sim.cpt.AR1.R')
+set.seed(879123)
+x=sim.cpt.AR1(cpts=c(0,100,200),X=cbind(rep(1,200)),init=0,
+    beta=rbind(c(0,0.9),c(1,0.9)),sig2=(1-0.9^2),nsim=1)
+plot(cpt.meanvar(x,method='PELT'))
+```
+
+## Autocorrelation -ve
+
+What effect does autocorrelation have on our analysis?
+
+```{r, out.height='0.6\\textheight'}
+set.seed(879123)
+x=sim.cpt.AR1(cpts=c(0,100,200),X=cbind(rep(1,200)),init=0,
+    beta=rbind(c(0,-0.9),c(1,-0.9)),sig2=(1-0.9^2),nsim=1)
+plot(cpt.meanvar(x,method='PELT'))
+```
+
+## EnvCpt
+EnvCpt automatically fits 12 different models to your data:
+
+* Flat mean (+AR1, +AR2, +Change, +AR1+Change, +AR2+Change)
+* Trend mean (+AR1, +AR2, +Change, +AR1+Change, +AR2+Change)
+
+AR1= autoregressive of order 1 = current data point is strongly related to the last data point.
+
+**BONUS**: Can see which model is best
+
+**PITFALL**: Might be best to use another model which isn't checked - always look at the fit!
+
+## EnvCpt: Example
+```{r}
+set.seed(879123)
+x=sim.cpt.AR1(cpts=c(0,100,200),X=cbind(rep(1,200)),init=0,
+    beta=rbind(c(0,0.9),c(1,0.9)),sig2=(1-0.9^2),nsim=1)
+out=envcpt(x)
+which.min(BIC(out))
+```
+## EnvCpt: Example
+```{r, out.height='0.7\\textheight', out.width='\\textwidth'}
+plot(out)
+```
+
+## EnvCpt: Example
+```{r, out.height='0.5\\textheight'}
+cpts(out$meanar1cpt)
+plot(out[[which.min(BIC(out))+1]])
+abline(v=cpts(out$meanar1cpt),col='blue')
+```
+## EnvCpt: A&E Gallstone
+HES Data on monthly proportion of A&E admissions for gallstone disease from Jan 2010 - Dec 2019.
+```{r,fig.height=3,fig.width=7,out.height='0.35\\textheight',out.width='\\textwidth'}
+load('AnEGallstoneProp.Rdata')
+plot(AnEGallstoneProp[,2],type='l')
+```
+
+Use EnvCpt to see if there is evidence for changes in the monthly proportion of A&E admissions for gallstone disease.
+
+## Gallstone Solution
+```{r}
+out=envcpt(AnEGallstoneProp[,2])
+which.min(BIC(out))
+```
+
+## Gallstone Solution
+```{r, out.height='0.7\\textheight', out.width='\\textwidth'}
+plot(out)
+```
+## Gallstone Solution
+```{r, out.height='0.6\\textheight'}
+AnEGallstoneProp$Date[cpts(out$trendar1cpt)]
+plot(out$trendar1cpt)
+```
+
+## Multivariate changes
+
+In moving to the multivariate setting a number of different scenarios could arise.
+
+* The process in each channel could be unconnected to the rest (i.e.
+repeated use of univariate cpt methods might be appropriate);
+* There may be some shared structure across channels. For example
+  * Changes occur at the same time in all channels;
+  * Changes occur in a subset of channels at the same time.
+* The nature of the change could vary from one channel to another;
+* \ldots and doubtless many more scenarios!
+
+## Multivariate changes
+In the multivariate setting we encounter new challenges:
+
+* Computational expense.
+* Sparsity of changepoints.
+* Incorporating multivariate power.
+
+\includegraphics[height=0.43\textheight]{multivariatecolour}
+
+## Many methods
+
+Some well known multivariate changepoint approaches include:
+
+* [ecp:](https://www.jstatsoft.org/article/view/v062i07) James, Matteson (2015)
+* [Inspect:](https://rss.onlinelibrary.wiley.com/doi/full/10.1111/rssb.12243) Wang, Samworth (2017)
+* [DoubleCUSUM:](https://projecteuclid.org/euclid.ejs/1468849969) Cho (2016)
+
+
+## GeomCP Intuition
+
+\includegraphics[height=0.8\textheight]{GeometricIntuition}
+
+## GeomCP Mean Ex
+
+```{r, out.height='0.6\\textheight'}
+set.seed(1)
+Y=rbind(matrix(rnorm(100*20),ncol=20),cbind(matrix(rnorm(100*10),
+    ncol=10),matrix(rnorm(100*10,1),ncol=10)))
+image(Y)
+```
+## GeomCP: Mean Ex
+
+```{r, out.height='0.6\\textheight'}
+res <- geomcp(Y)
+plot(res)
+```
+
+## GeomCP MeanVar Ex
+
+```{r, out.height='0.6\\textheight'}
+set.seed(1)
+Y=rbind(matrix(rnorm(100*20),ncol=20),cbind(matrix(rnorm(100*10,0,2),
+    ncol=10),matrix(rnorm(100*10,1,2),ncol=10)))
+image(Y)
+```
+## GeomCP: MeanVar Ex
+
+```{r,, out.height='0.6\\textheight'}
+res <- geomcp(Y)
+plot(res)
+```
+
+## Task: Genetics
+Analyse the ACGH Bladder Tumor data from the ecp package.  It is 2215x43 with 43 patients. How many changes do you find?
+
+```{r, out.height='0.5\\textheight'}
+data(ACGH)
+image(ACGH$data)
+```
+
+## Solution: Genetics
+```{r, out.height='0.6\\textheight'}
+outACGH <- geomcp(ACGH$data)
+plot(outACGH)
+```
+
+
+## Solution: Genetics
+Can also take the distance and angle vectors and analyse using CROPS
+```{r, results='hide',fig.keep='all',out.height='0.6\\textheight'}
+outACGH.dist=cpt.meanvar(distance(outACGH),method='PELT',
+    penalty='CROPS',pen.value=c(5,500))
+plot(outACGH.dist,diagnostic=TRUE)
+```
+
+## Influence
+
+* Which data points are *influential* for obtaining the segmentation? 
+  * Changepoints versus Outliers
+  * How to measure influence?
+* How *stable* is the obtained segmentation?
+
+## Influence: Example
+```{r, out.height='0.7\\textheight'}
+set.seed(30) 
+x=c(rnorm(50),rnorm(50,mean=5),rnorm(1,mean=15),rnorm(49,mean=5),rnorm(50,mean=4))
+xcpt=cpt.mean(x,method='PELT')
+plot(xcpt,cpt.width=3,ylab='')
+```
+## How to measure?
+Sources of Inspiration:
+
+* Regression Analysis: Measures of Influence (e.g., Cook's distance)
+* Robust Statistics: Influence Functions
+
+Two routes:
+
+* Modifying an observation
+* Leaving out an observation
+
+## Modify
+\includegraphics[scale=0.45]{changemeanoutlier} 
+
+## Stability Dashboard: Mod
+```{r, out.height='0.7\\textheight'}
+x.inf=influence.generate.PELT(xcpt,method='modify')
+stability.overview(x,cpts(xcpt),x.inf,cex.main=0.9)
+```
+
+## Location Stability: Mod
+```{r, out.height='0.7\\textheight'}
+location.stability(cpts(xcpt),x.inf,cex.main=0.9)
+```
+
+## Parameter Stability: Mod
+```{r, out.height='0.7\\textheight'}
+parameter.stability(x.inf,original.mean=rep(param.est(xcpt)$mean,
+    times=diff(c(0,xcpt@cpts))),cex.main=0.9)
+```
+
+## Influence Map: Mod
+\begin{center}
+\includegraphics[height=0.8\textheight]{Sim30InfMapOut}
+\end{center}
+
+## Stability Dashboard: Del
+```{r, out.height='0.7\\textheight'}
+x.inf=influence.generate.PELT(xcpt,method='delete')
+stability.overview(x,cpts(xcpt),x.inf,cex.main=0.9)
+```
+
+## Location Stability: Del
+```{r, out.height='0.7\\textheight'}
+location.stability(cpts(xcpt),x.inf,cex.main=0.9)
+```
+
+## Parameter Stability: Del
+```{r, out.height='0.7\\textheight'}
+parameter.stability(x.inf,original.mean=rep(param.est(xcpt)$mean,
+    times=diff(c(0,xcpt@cpts))),cex.main=0.9)
+```
+
+## Influence Map: Del
+\begin{center}
+\includegraphics[height=0.8\textheight]{Sim30InfMapDel}
+\end{center}
+
+## Summary
+
+* Multivariate  is interesting but still lots of challenges in the univariate space
+* Lots of interesting research in the changepoint space
+* Always looking for interesting problems to work on
+* Reach out if you want help / guidance
+
+## References
+[PELT:](http://www.tandfonline.com/doi/abs/10.1080/01621459.2012.737745) Killick, Fearnhead, Eckley (2012)  
+
+[EnvCpt:](https://doi.org/10.1175/JCLI-D-17-0863.1) Beaulieu, Killick (2018) 
+
+[geomCP:](https://link.springer.com/article/10.1007/s11222-020-09940-y) Grundy, Killick (2020)
+
+Influence: Wilms, Killick, Matteson (2020+)
+
