@@ -203,21 +203,6 @@ plot(AnEGallstoneProp[,2],type='l')
 
 Use EnvCpt to see if there is evidence for changes in the monthly proportion of A&E admissions for gallstone disease.
 
-## Gallstone Solution
-```{r}
-out=envcpt(AnEGallstoneProp[,2])
-which.min(BIC(out))
-```
-
-## Gallstone Solution
-```{r, out.height='0.7\\textheight', out.width='\\textwidth'}
-plot(out)
-```
-## Gallstone Solution
-```{r, out.height='0.6\\textheight'}
-AnEGallstoneProp$Date[cpts(out$trendar1cpt)]
-plot(out$trendar1cpt)
-```
 
 ## Multivariate changes
 
@@ -291,20 +276,6 @@ data(ACGH)
 image(ACGH$data)
 ```
 
-## Solution: Genetics
-```{r, out.height='0.6\\textheight'}
-outACGH <- geomcp(ACGH$data)
-plot(outACGH)
-```
-
-
-## Solution: Genetics
-Can also take the distance and angle vectors and analyse using CROPS
-```{r, results='hide',fig.keep='all',out.height='0.6\\textheight'}
-outACGH.dist=cpt.meanvar(distance(outACGH),method='PELT',
-    penalty='CROPS',pen.value=c(5,500))
-plot(outACGH.dist,diagnostic=TRUE)
-```
 
 ## Influence
 
