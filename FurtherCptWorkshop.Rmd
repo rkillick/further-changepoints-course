@@ -1,7 +1,7 @@
 ---
 title: "Further Changepoint Analysis"
 author: "Rebecca Killick(r.killick@lancs.ac.uk)"
-date: "NHS Workshop 2020"
+date: "NHS Workshop 2021"
 output:
   beamer_presentation:
     includes:
@@ -38,8 +38,8 @@ knitr::opts_knit$set(progress = FALSE,verbose = FALSE)
 * Recap of changepoints
 * Checking assumptions
 * Autocorrelation
-* Influence
 * Multivariate changepoints
+* Influence
 
 There will be tasks throughout the sections.
 
@@ -163,6 +163,19 @@ x=sim.cpt.AR1(cpts=c(0,100,200),X=cbind(rep(1,200)),init=0,
 plot(cpt.meanvar(x,method='PELT'))
 ```
 
+## Exercise
+Take a look at the "Lai2005fig4" data in the `changepoint` package.
+Fit changes in mean as below, then check the residuals.  
+
+Are the assumptions of our model reasonable?
+
+```{r}
+data("Lai2005fig4")
+out=cpt.mean(Lai2005fig4$GBM29,method='PELT')
+```
+
+Don't forget to look at the data!
+
 ## EnvCpt
 EnvCpt automatically fits 12 different models to your data:
 
@@ -203,6 +216,108 @@ plot(AnEGallstoneProp[,2],type='l')
 
 Use EnvCpt to see if there is evidence for changes in the monthly proportion of A&E admissions for gallstone disease.
 
+## Gallstone Solution
+```{r}
+out=envcpt(AnEGallstoneProp[,2])
+which.min(BIC(out))
+```
+
+## Gallstone Solution
+```{r, out.height='0.7\\textheight', out.width='\\textwidth'}
+plot(out)
+```
+## Gallstone Solution
+```{r, out.height='0.6\\textheight'}
+AnEGallstoneProp$Date[cpts(out$trendar1cpt)]
+plot(out$trendar1cpt)
+```
+
+## Exercise
+
+Go back to the "Lai2005fig4" data.  Use `envcpt()` to identify the best model.  Does this fit with what we observed previously?
+
+
+## Influence
+
+* Which data points are *influential* for obtaining the segmentation? 
+  * Changepoints versus Outliers
+  * How to measure influence?
+* How *stable* is the obtained segmentation?
+
+## Influence: Example
+```{r, out.height='0.7\\textheight'}
+set.seed(30) 
+x=c(rnorm(50),rnorm(50,mean=5),rnorm(1,mean=15),
+  rnorm(49,mean=5),rnorm(50,mean=4))
+xcpt=cpt.mean(x,method='PELT')
+plot(xcpt,cpt.width=3,ylab='')
+```
+## How to measure?
+Sources of Inspiration:
+
+* Regression Analysis: Measures of Influence (e.g., Cook's distance)
+* Robust Statistics: Influence Functions
+
+Two routes:
+
+* Modifying an observation
+* Leaving out an observation
+
+## Modify
+\includegraphics[scale=0.45]{changemeanoutlier} 
+
+## Stability Dashboard: Out
+```{r, out.height='0.7\\textheight'}
+x.inf.out=influence(xcpt,method='outlier')
+out.Stability=StabilityOverview(x,cpts(xcpt),x.inf.out,
+  legend.args=list(display=TRUE,x="topright",y=NULL,cex=1,
+  horiz=FALSE,xpd=FALSE,bty='n'))
+```
+
+## Location Stability: Out
+```{r, out.height='0.7\\textheight'}
+out.location=LocationStability(cpts(xcpt),x.inf.out,
+  type='Difference')
+```
+
+## Parameter Stability: Out
+```{r, out.height='0.7\\textheight'}
+ParameterStability(x.inf.out,original.mean=rep(
+  param.est(xcpt)$mean,times=diff(c(0,xcpt@cpts))))
+```
+
+## Influence Map: Out
+
+```{r}
+out.map=InfluenceMap(cpts(xcpt),x.inf.out)
+```
+
+## Stability Dashboard: Del
+```{r, out.height='0.7\\textheight'}
+x.inf.del=influence(xcpt,method='delete')
+del.Stability=StabilityOverview(x,cpts(xcpt),x.inf.del,
+  legend.args=list(display=TRUE,x="topright",y=NULL,cex=1,
+  horiz=FALSE,xpd=FALSE,bty='n'))
+```
+
+## Location Stability: Del
+```{r, out.height='0.7\\textheight'}
+del.location=LocationStability(cpts(xcpt),x.inf.del,
+  type='Difference')
+```
+
+## Parameter Stability: Del
+```{r, out.height='0.7\\textheight'}
+ParameterStability(x.inf.del,original.mean=rep(
+  param.est(xcpt)$mean,times=diff(c(0,xcpt@cpts))))
+```
+
+## Influence Map: Del
+
+```{r}
+del.map=InfluenceMap(cpts(xcpt),x.inf.del)
+```
+
 
 ## Multivariate changes
 
@@ -215,6 +330,7 @@ repeated use of univariate cpt methods might be appropriate);
   * Changes occur in a subset of channels at the same time.
 * The nature of the change could vary from one channel to another;
 * \ldots and doubtless many more scenarios!
+
 
 ## Multivariate changes
 In the multivariate setting we encounter new challenges:
@@ -276,78 +392,21 @@ data(ACGH)
 image(ACGH$data)
 ```
 
-
-## Influence
-
-* Which data points are *influential* for obtaining the segmentation? 
-  * Changepoints versus Outliers
-  * How to measure influence?
-* How *stable* is the obtained segmentation?
-
-## Influence: Example
-```{r, out.height='0.7\\textheight'}
-set.seed(30) 
-x=c(rnorm(50),rnorm(50,mean=5),rnorm(1,mean=15),rnorm(49,mean=5),rnorm(50,mean=4))
-xcpt=cpt.mean(x,method='PELT')
-plot(xcpt,cpt.width=3,ylab='')
-```
-## How to measure?
-Sources of Inspiration:
-
-* Regression Analysis: Measures of Influence (e.g., Cook's distance)
-* Robust Statistics: Influence Functions
-
-Two routes:
-
-* Modifying an observation
-* Leaving out an observation
-
-## Modify
-\includegraphics[scale=0.45]{changemeanoutlier} 
-
-## Stability Dashboard: Mod
-```{r, out.height='0.7\\textheight'}
-x.inf=influence.generate.PELT(xcpt,method='modify')
-stability.overview(x,cpts(xcpt),x.inf,cex.main=0.9)
+## Solution: Genetics
+```{r, out.height='0.6\\textheight'}
+outACGH <- geomcp(ACGH$data)
+plot(outACGH)
 ```
 
-## Location Stability: Mod
-```{r, out.height='0.7\\textheight'}
-location.stability(cpts(xcpt),x.inf,cex.main=0.9)
+
+## Solution: Genetics
+Can also take the distance and angle vectors and analyse using CROPS
+```{r, results='hide',fig.keep='all',out.height='0.6\\textheight'}
+outACGH.dist=cpt.meanvar(distance(outACGH),method='PELT',
+    penalty='CROPS',pen.value=c(5,500))
+plot(outACGH.dist,diagnostic=TRUE)
 ```
 
-## Parameter Stability: Mod
-```{r, out.height='0.7\\textheight'}
-parameter.stability(x.inf,original.mean=rep(param.est(xcpt)$mean,
-    times=diff(c(0,xcpt@cpts))),cex.main=0.9)
-```
-
-## Influence Map: Mod
-\begin{center}
-\includegraphics[height=0.8\textheight]{Sim30InfMapOut}
-\end{center}
-
-## Stability Dashboard: Del
-```{r, out.height='0.7\\textheight'}
-x.inf=influence.generate.PELT(xcpt,method='delete')
-stability.overview(x,cpts(xcpt),x.inf,cex.main=0.9)
-```
-
-## Location Stability: Del
-```{r, out.height='0.7\\textheight'}
-location.stability(cpts(xcpt),x.inf,cex.main=0.9)
-```
-
-## Parameter Stability: Del
-```{r, out.height='0.7\\textheight'}
-parameter.stability(x.inf,original.mean=rep(param.est(xcpt)$mean,
-    times=diff(c(0,xcpt@cpts))),cex.main=0.9)
-```
-
-## Influence Map: Del
-\begin{center}
-\includegraphics[height=0.8\textheight]{Sim30InfMapDel}
-\end{center}
 
 ## Summary
 
@@ -363,5 +422,5 @@ parameter.stability(x.inf,original.mean=rep(param.est(xcpt)$mean,
 
 [geomCP:](https://link.springer.com/article/10.1007/s11222-020-09940-y) Grundy, Killick (2020)
 
-Influence: Wilms, Killick, Matteson (2020+)
+[Influence:](https://www.tandfonline.com/doi/full/10.1080/10618600.2021.2000873) Wilms, Killick, Matteson (2021+)
 
